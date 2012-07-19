@@ -1,0 +1,112 @@
+#!/usr/bin/env python
+import csv, os, sys, textwrap, time
+
+homedir = os.path.expanduser("~")
+file = homedir + '/.todo'
+choice = ""
+time_unit = 60   # use 60 for minute (standard), or 1 for second (debug)
+block_size = 25
+############### end of variables ###############
+
+def print_tasks(): # print list, omitting completed items
+  new_tasks = []
+  done_tasks = []
+  hdr = ('', 'Category', 'Blks', 'Description')
+  indent = 23 * ' '
+  item_num = 1
+  menu_fmt = "%-3s %-12s %-5s %-40s"
+  menu ="""
+Enter a choice...
+[category] for new task / [task number] to execute / \"q\" to quit: """
+  
+  os.system('clear')
+  print menu_fmt % hdr 
+  with open(file, 'rb') as b:
+    tasks = csv.reader(b)
+    for row in tasks: # replace 'new' w/ # and add line to new_tasks
+      if row[0] == 'new': 
+        line = [ item_num, row[1], row[2], row[3] ]
+        new_tasks.append(line)
+        print menu_fmt % (item_num, row[1], row[3], textwrap.fill(
+            row[2], 58, subsequent_indent=indent))
+        item_num += 1
+      
+      elif row[0] == 'x': # leave line intact & add to done_tasks
+        line = [ 'x', row[1], row[2], row[3], row[4] ]
+        done_tasks.append(line)
+
+    choice = raw_input(menu)
+    return choice, new_tasks, done_tasks
+
+
+def timer():
+  char = '*'
+  print '_' * block_size
+  for n in range(block_size):
+    time.sleep(time_unit)
+    sys.stdout.write(char)
+    sys.stdout.flush()
+############### end of functions ###############
+
+
+while True:
+  choice, new_tasks, done_tasks = print_tasks()
+
+  if choice.isdigit() == False and choice != "q": # add new task
+    category = choice
+    desc = raw_input("Enter task description: ")
+    new_est_min = raw_input("How many blocks will you need? ")
+    new_task = ['new', category, desc, new_est_min]
+    tasks = open(file, 'a')
+    new_tasks.append(new_task)
+    tasks.write( '%s,%s,%s,%s\n' % (
+          'new', category, desc, new_est_min))
+    tasks.close()
+
+  elif choice == "q": # quit
+    os.system('clear')
+    exit()
+
+  else: # execute task
+    try:
+      active_task = int(choice) - 1
+      selected_task = new_tasks[active_task]
+      blocks = int(selected_task[3])
+      os.system('clear')
+      print "Selected: \"%s\"" % selected_task[2]
+
+      while blocks > 1: # run through assigned blocks
+        timer()
+        os.system('xkbbell')
+        raw_input("\a\n[ENTER] to start next block... ")
+        blocks -= 1
+      timer() 
+      os.system('xkbbell')
+      more_time = raw_input("\a\nAnother block? ")
+    except KeyboardInterrupt:
+      print "\nFinishing task early..."
+      more_time = 'n'
+
+    while more_time == 'y': # add more blocks
+      timer()  	
+      os.system('xkbbell')
+      more_time = raw_input("\a\nAnother block? ")
+      blocks += 1
+
+    with open(file, 'wb') as b: # update the file
+      writer = csv.writer(b)
+      updated_tasks = []
+      for row in new_tasks:
+        if row[0] == int(choice): # find completed line item
+          row[0] = 'x'      # mark as complete
+          row.append(blocks)  # add time elapsed
+          done_tasks.append(row)# add completed item to done tasks
+        else:          # process all other lines
+          row[0] = 'new'     # change first entry BACK to 'new'
+          # TODO: don't modify & restore data; use a list just to 
+          # display new items without changing data
+          updated_tasks.append(row)
+      for row in done_tasks:
+        writer.writerow(row)   # write the data back to file
+      for row in updated_tasks:
+        writer.writerow(row)   # write the data back to file
